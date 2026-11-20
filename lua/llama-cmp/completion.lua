@@ -269,8 +269,8 @@ function M.accept_word()
       local cursor = vim.api.nvim_win_get_cursor(0)
       local row = cursor[1]
       local col = cursor[2]
-      local word = vim.split(text, ' ')[1] -- Extract the first word
-      vim.api.nvim_buf_set_text(0, row - 1, col, col, col, { word })
+      local word = vim.split(text, "%s+")[1] -- Extract the first word
+      vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, col, { word })
       vim.api.nvim_win_set_cursor(0, { row, col + #word })
    end)
 end
