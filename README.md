@@ -11,6 +11,7 @@ Local Copilot-style code completions for Neovim using [Ollama](https://ollama.ai
 - **Local & Private** - All completions run on your machine via Ollama
 - **Streaming** - Ghost text updates in real-time as tokens arrive
 - **Multi-line** - Full support for multi-line completions
+- **Word Accept** - Accept only the next word/token of a suggestion with `<C-j>`
 - **LSP Context** - Sends type info, signatures, and diagnostics to the model
 - **FIM Support** - Pre-configured for popular code models (CodeLlama, Qwen, DeepSeek, StarCoder, etc.)
 - **Zero Dependencies** - No external Lua dependencies, just `curl`
@@ -90,11 +91,14 @@ git clone https://github.com/maxpaulus43/llama-cmp.nvim \
 
 | Key | Action |
 |-----|--------|
-| `<Tab>` | Accept suggestion |
+| `<Tab>` | Accept the full suggestion |
+| `<C-j>` | Accept only the first word of the suggestion |
 | `<C-]>` | Dismiss suggestion |
 | `<C-Space>` | Manually trigger completion |
 
-All keymaps are configurable. Tab falls back to normal behavior when no suggestion is visible.
+All keymaps are configurable and apply in insert mode. Tab falls back to normal behavior when no suggestion is visible. `<C-j>` was chosen for word-accept because it is a valid keycode that works in terminals (unlike `<C-Tab>`).
+
+When accepting a word, any leading whitespace and opening brackets/parens are included along with the first word or token, then the rest of the suggestion is discarded.
 
 ## Configuration
 
@@ -142,7 +146,8 @@ require("llama-cmp").setup({
 
   -- Keymaps (set to false to disable)
   keymaps = {
-    accept = "<Tab>",
+    accept = "<Tab>",        -- Accept full suggestion
+    accept_word = "<C-j>",   -- Accept first word only
     dismiss = "<C-]>",
     trigger = "<C-Space>",
   },
@@ -205,7 +210,8 @@ Or configure tokens manually via the `fim` option.
 local llama = require("llama-cmp")
 
 llama.trigger()        -- Trigger completion
-llama.accept()         -- Accept suggestion
+llama.accept()         -- Accept full suggestion
+llama.accept_word()    -- Accept only the first word of the suggestion
 llama.dismiss()        -- Dismiss suggestion
 llama.is_visible()     -- Check if suggestion showing
 llama.get_suggestion() -- Get current suggestion text
@@ -300,7 +306,9 @@ require("llama-cmp").setup({
 
 3. **Streams the response** from Ollama, updating ghost text as tokens arrive
 
-4. **On Tab**, inserts the suggestion and moves cursor to the end
+4. **On Tab**, inserts the full suggestion and moves the cursor to the end
+
+5. **On `<C-j>`**, inserts only the next word/token of the suggestion (including any leading whitespace and brackets) and discards the rest
 
 ## Contributing
 

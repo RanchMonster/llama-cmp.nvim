@@ -187,6 +187,44 @@ function M.trigger(manual)
    end
 end
 
+---@private
+---@param text string The text to insert into the buffer
+---@param row number The row at which to insert the text
+---@param col number The column at which to insert the text
+local function clean_insert(text, row, col)
+   -- Split text into lines
+   local lines = vim.split(text, "\n", { plain = true })
+
+   if #lines == 1 then
+      -- Single line: insert at cursor
+      local current_line = vim.api.nvim_buf_get_lines(0, row - 1, row, false)[1] or ""
+      local before = current_line:sub(1, col)
+      local after = current_line:sub(col + 1)
+      local new_line = before .. text .. after
+      vim.api.nvim_buf_set_lines(0, row - 1, row, false, { new_line })
+      local new_col = col + #text
+      vim.api.nvim_win_set_cursor(0, { row, new_col })
+      return { row, new_col }
+   else
+      -- Multi-line: more complex insertion
+      local current_line = vim.api.nvim_buf_get_lines(0, row - 1, row, false)[1] or ""
+      local before = current_line:sub(1, col)
+      local after = current_line:sub(col + 1)
+
+      -- First line gets the text before cursor + first line of suggestion
+      lines[1] = before .. lines[1]
+      -- Last line gets the last line of suggestion + text after cursor
+      lines[#lines] = lines[#lines] .. after
+
+      vim.api.nvim_buf_set_lines(0, row - 1, row, false, lines)
+
+      -- Move cursor to end of inserted text
+      local new_row = row + #lines - 1
+      local new_col = #lines[#lines] - #after
+      vim.api.nvim_win_set_cursor(0, { new_row, new_col })
+      return { new_row, new_col }
+   end
+end
 --- Accept the current suggestion
 ---@return boolean success
 function M.accept()
@@ -215,35 +253,7 @@ function M.accept()
       local row = cursor[1]
       local col = cursor[2]
 
-      -- Split text into lines
-      local lines = vim.split(text, "\n", { plain = true })
-
-      if #lines == 1 then
-         -- Single line: insert at cursor
-         local current_line = vim.api.nvim_buf_get_lines(0, row - 1, row, false)[1] or ""
-         local before = current_line:sub(1, col)
-         local after = current_line:sub(col + 1)
-         local new_line = before .. text .. after
-         vim.api.nvim_buf_set_lines(0, row - 1, row, false, { new_line })
-         vim.api.nvim_win_set_cursor(0, { row, col + #text })
-      else
-         -- Multi-line: more complex insertion
-         local current_line = vim.api.nvim_buf_get_lines(0, row - 1, row, false)[1] or ""
-         local before = current_line:sub(1, col)
-         local after = current_line:sub(col + 1)
-
-         -- First line gets the text before cursor + first line of suggestion
-         lines[1] = before .. lines[1]
-         -- Last line gets the last line of suggestion + text after cursor
-         lines[#lines] = lines[#lines] .. after
-
-         vim.api.nvim_buf_set_lines(0, row - 1, row, false, lines)
-
-         -- Move cursor to end of inserted text
-         local new_row = row + #lines - 1
-         local new_col = #lines[#lines] - #after
-         vim.api.nvim_win_set_cursor(0, { new_row, new_col })
-      end
+      clean_insert(text, row, col)
    end)
 
    return true
@@ -254,25 +264,45 @@ function M.accept_word()
       return false
    end
 
-   local text = state.suggestion
 
-   -- Clear ghost text first
-   ghost.clear()
 
-   -- Reset state before scheduling to prevent double-accept
-   reset_state()
+
+
 
    -- Schedule the buffer modification to avoid E565 error
    -- (Not allowed to change text or change window)
    vim.schedule(function()
+      local text = state.suggestion:match("^%s*%S+")
+      -- if there is nothing to accept, return failure.
+      -- it is very unlikely this will happen though
+      if text == nil then
+         return
+      end
+
+
       -- Insert the text at cursor position
       local cursor = vim.api.nvim_win_get_cursor(0)
       local row = cursor[1]
       local col = cursor[2]
-      local word = vim.split(text, "%s+")[1] -- Extract the first word
-      vim.api.nvim_buf_set_text(0, row - 1, col, row - 1, col, { word })
-      vim.api.nvim_win_set_cursor(0, { row, col + #word })
+
+      cursor = clean_insert(text, row, col)
+      row = cursor[1]
+      col = cursor[2]
+
+      if #text < #state.suggestion then
+         state.suggestion = state.suggestion:sub(#text + 1)
+         ghost.show(state.suggestion, state.bufnr, cursor)
+         return
+      end
+
+      -- empty the exhausted suggestion
+      state.suggestion = ""
+
+      if state.status ~= STATE.STREAMING then
+         reset_state()
+      end
    end)
+   return true
 end
 
 --- Dismiss the current suggestion
