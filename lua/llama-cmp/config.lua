@@ -89,7 +89,7 @@ M.defaults = {
    -- Keymaps (set to false to disable individual keymaps)
    keymaps = {
       accept = "<Tab>",
-      accept_word = "<C-Tab>",
+      accept_word = "<C-j>",
       dismiss = "<C-]>",
       trigger = "<C-Space>",
    },
